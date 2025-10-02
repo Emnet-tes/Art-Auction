@@ -16,7 +16,7 @@ export default function NotFound() {
               Artwork Not Found
             </h1>
             <p className="text-muted-foreground">
-              The artwork you're looking for doesn't exist or may have been
+              The artwork you&apos;re looking for doesn&apos;t exist or may have
               removed from the auction.
             </p>
           </div>

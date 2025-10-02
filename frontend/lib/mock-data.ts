@@ -40,7 +40,7 @@ export const mockArtworks: Artwork[] = [
     description:
       "A stunning oil painting capturing the essence of dawn breaking over misty mountains. This piece showcases Volkov's masterful use of light and atmospheric perspective.",
     category: "Painting",
-    imageUrl: "/abstract-oil-painting-misty-mountains-dawn.jpg",
+    imageUrl: "/abstractoilpaintingmistymountainsdawn.jpg",
     startingBid: 2500,
     currentBid: 3200,
     minIncrement: 100,
