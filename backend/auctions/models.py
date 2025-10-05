@@ -24,7 +24,7 @@ class Artwork(models.Model):
     end_time = models.DateTimeField()
     highest_bidder = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='highest_bids')
     created_at = models.DateTimeField(auto_now_add=True)
-
+    is_active = models.BooleanField(default=True)
     def __str__(self):
         return self.title
 
