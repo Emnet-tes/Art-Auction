@@ -4,9 +4,30 @@ import Link from "next/link";
 import { useState } from "react";
 import { Menu, X, Gavel, User, Heart } from "lucide-react";
 import { Button } from "@mui/material";
+import { login } from "@/lib/api";
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
+
+  const handleLogin = async () => {
+    // Simple login prompt (replace with proper form)
+    const username = prompt("Username:");
+    const password = prompt("Password:");
+    if (username && password) {
+      try {
+        await login(username, password);
+        setIsLoggedIn(true);
+      } catch (error) {
+        alert("Login failed");
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setIsLoggedIn(false);
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -48,10 +69,17 @@ export function Header() {
               <Heart className="h-4 w-4 mr-2" />
               Watchlist
             </Button>
-            <Button variant="outlined" size="small">
-              <User className="h-4 w-4 mr-2" />
-              Sign In
-            </Button>
+            {isLoggedIn ? (
+              <Button variant="outlined" size="small" onClick={handleLogout}>
+                <User className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            ) : (
+              <Button variant="outlined" size="small" onClick={handleLogin}>
+                <User className="h-4 w-4 mr-2" />
+                Sign In
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -99,14 +127,27 @@ export function Header() {
                   <Heart className="h-4 w-4 mr-2" />
                   Watchlist
                 </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  className="justify-start bg-transparent"
-                >
-                  <User className="h-4 w-4 mr-2" />
-                  Sign In
-                </Button>
+                {isLoggedIn ? (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    className="justify-start bg-transparent"
+                    onClick={handleLogout}
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Logout
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    className="justify-start bg-transparent"
+                    onClick={handleLogin}
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Sign In
+                  </Button>
+                )}
               </div>
             </nav>
           </div>

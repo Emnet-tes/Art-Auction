@@ -1,34 +1,38 @@
 export interface Artwork {
-  id: string
-  title: string
-  artist: string
-  description: string
-  category: "Painting" | "Sculpture" | "Digital" | "Photography"
-  imageUrl: string
-  startingBid: number
-  currentBid: number
-  minIncrement: number
-  endTime: Date
-  highestBidder?: string
-  bidHistory: Bid[]
+  id: string;
+  title: string;
+  artist: string;
+  description: string;
+  category: "Painting" | "Sculpture" | "Digital" | "Photography";
+  image_url: string; // Changed from image_url
+  starting_bid: number; // Changed from startingBid
+  current_bid: number; // Changed from current_bid
+  min_increment: number; // Changed from min_increment
+  end_time: Date; // Changed from end_time
+  highest_bidder?: string;
+  highest_bidder_name?: string; // Added
+  bid_history: Bid[]; // Changed from bidHistory
+  created_at?: string; // Added
+  is_active?: boolean; // Added
 }
 
 export interface Bid {
-  id: string
-  artworkId: string
-  bidderName: string
-  amount: number
-  timestamp: Date
+  id: string;
+  artwork: string; // Changed from artworkId
+  bidder: string;
+  bidder_name: string; // Changed from bidderName
+  amount: number;
+  timestamp: Date; // Changed from timestamp
 }
 
 export interface UserBid {
-  artworkId: string
-  artwork: Artwork
-  myHighestBid: number
-  status: "active" | "outbid" | "won" | "lost"
-  wonDate?: Date
-  paymentStatus?: "pending" | "paid"
-  shippingStatus?: "preparing" | "shipped" | "delivered"
+  artworkId: string;
+  artwork: Artwork;
+  myHighestBid: number;
+  status: "active" | "outbid" | "won" | "lost";
+  wonDate?: Date;
+  paymentStatus?: "pending" | "paid";
+  shippingStatus?: "preparing" | "shipped" | "delivered";
 }
 
 // Mock data for development
@@ -40,33 +44,36 @@ export const mockArtworks: Artwork[] = [
     description:
       "A stunning oil painting capturing the essence of dawn breaking over misty mountains. This piece showcases Volkov's masterful use of light and atmospheric perspective.",
     category: "Painting",
-    imageUrl: "/abstractoilpaintingmistymountainsdawn.jpg",
-    startingBid: 2500,
-    currentBid: 3200,
-    minIncrement: 100,
-    endTime: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
-    highestBidder: "ArtCollector_92",
-    bidHistory: [
+    image_url: "/abstractoilpaintingmistymountainsdawn.jpg", // Changed
+    starting_bid: 2500, // Changed
+    current_bid: 3200, // Changed
+    min_increment: 100, // Changed
+    end_time: new Date(Date.now() + 2 * 60 * 60 * 1000), // Changed
+    highest_bidder: "ArtCollector_92",
+    bid_history: [
       {
         id: "1",
-        artworkId: "1",
-        bidderName: "ArtCollector_92",
+        artwork: "1", // Changed
+        bidder: "ArtCollector_92", // Changed
+        bidder_name: "ArtCollector_92", // Changed
         amount: 3200,
-        timestamp: new Date(Date.now() - 15 * 60 * 1000),
+        timestamp: new Date(Date.now() - 15 * 60 * 1000), // Changed
       },
       {
         id: "2",
-        artworkId: "1",
-        bidderName: "GalleryOwner",
+        artwork: "1", // Changed
+        bidder: "GalleryOwner",
         amount: 3000,
         timestamp: new Date(Date.now() - 30 * 60 * 1000),
+        bidder_name: ""
       },
       {
         id: "3",
-        artworkId: "1",
-        bidderName: "ModernArt_Fan",
+        artwork: "1", // Changed
+        bidder: "ModernArt_Fan",
         amount: 2800,
         timestamp: new Date(Date.now() - 45 * 60 * 1000),
+        bidder_name: ""
       },
     ],
   },
@@ -77,26 +84,28 @@ export const mockArtworks: Artwork[] = [
     description:
       "A dynamic bronze sculpture representing the rhythm and energy of city life. Rodriguez's signature style brings movement to metal.",
     category: "Sculpture",
-    imageUrl: "/modern-bronze-sculpture-urban-abstract.jpg",
-    startingBid: 4500,
-    currentBid: 5800,
-    minIncrement: 200,
-    endTime: new Date(Date.now() + 8 * 60 * 1000), // 8 minutes from now (warning state)
-    highestBidder: "SculptureLover",
-    bidHistory: [
+    image_url: "/modern-bronze-sculpture-urban-abstract.jpg",
+    starting_bid: 4500,
+    current_bid: 5800,
+    min_increment: 200,
+    end_time: new Date(Date.now() + 8 * 60 * 1000), // 8 minutes from now (warning state)
+    highest_bidder: "SculptureLover",
+    bid_history: [
       {
         id: "4",
-        artworkId: "2",
-        bidderName: "SculptureLover",
+        artwork: "2",
+        bidder: "SculptureLover",
         amount: 5800,
         timestamp: new Date(Date.now() - 5 * 60 * 1000),
+        bidder_name: ""
       },
       {
         id: "5",
-        artworkId: "2",
-        bidderName: "MetalWorks_Co",
+        artwork: "2",
+        bidder: "MetalWorks_Co",
         amount: 5400,
         timestamp: new Date(Date.now() - 20 * 60 * 1000),
+        bidder_name: ""
       },
     ],
   },
@@ -107,19 +116,20 @@ export const mockArtworks: Artwork[] = [
     description:
       "An innovative digital artwork exploring the intersection of technology and human emotion. Limited edition NFT with physical print.",
     category: "Digital",
-    imageUrl: "/digital-art-neon-cyberpunk-abstract.jpg",
-    startingBid: 1200,
-    currentBid: 1800,
-    minIncrement: 50,
-    endTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
-    highestBidder: "CryptoArt_Enthusiast",
-    bidHistory: [
+    image_url: "/digital-art-neon-cyberpunk-abstract.jpg",
+    starting_bid: 1200,
+    current_bid: 1800,
+    min_increment: 50,
+    end_time: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+    highest_bidder: "CryptoArt_Enthusiast",
+    bid_history: [
       {
         id: "6",
-        artworkId: "3",
-        bidderName: "CryptoArt_Enthusiast",
+        artwork: "3",
+        bidder: "CryptoArt_Enthusiast",
         amount: 1800,
         timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        bidder_name: ""
       },
     ],
   },
@@ -130,19 +140,20 @@ export const mockArtworks: Artwork[] = [
     description:
       "A contemplative oil painting exploring themes of isolation and introspection through masterful use of blue tones.",
     category: "Painting",
-    imageUrl: "/blue-oil-painting-solitude-contemplative.jpg",
-    startingBid: 3000,
-    currentBid: 4200,
-    minIncrement: 150,
-    endTime: new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours from now
-    highestBidder: "BlueArt_Collector",
-    bidHistory: [
+    image_url: "/blue-oil-painting-solitude-contemplative.jpg",
+    starting_bid: 3000,
+    current_bid: 4200,
+    min_increment: 150,
+    end_time: new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours from now
+    highest_bidder: "BlueArt_Collector",
+    bid_history: [
       {
         id: "7",
-        artworkId: "4",
-        bidderName: "BlueArt_Collector",
+        artwork: "4",
+        bidder: "BlueArt_Collector",
         amount: 4200,
         timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
+        bidder_name: ""
       },
     ],
   },
@@ -153,19 +164,20 @@ export const mockArtworks: Artwork[] = [
     description:
       "A striking black and white photograph capturing the raw emotion of street life. Part of Kim's acclaimed urban series.",
     category: "Photography",
-    imageUrl: "/black-white-street-photography-urban-emotion.jpg",
-    startingBid: 800,
-    currentBid: 1200,
-    minIncrement: 25,
-    endTime: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours from now
-    highestBidder: "PhotoArt_Fan",
-    bidHistory: [
+    image_url: "/black-white-street-photography-urban-emotion.jpg",
+    starting_bid: 800,
+    current_bid: 1200,
+    min_increment: 25,
+    end_time: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours from now
+    highest_bidder: "PhotoArt_Fan",
+    bid_history: [
       {
         id: "8",
-        artworkId: "5",
-        bidderName: "PhotoArt_Fan",
+        artwork: "5",
+        bidder: "PhotoArt_Fan",
         amount: 1200,
         timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        bidder_name: ""
       },
     ],
   },
@@ -176,23 +188,24 @@ export const mockArtworks: Artwork[] = [
     description:
       "A classical oil painting inspired by Renaissance masters, showcasing traditional techniques with contemporary subjects.",
     category: "Painting",
-    imageUrl: "/renaissance-style-oil-painting-classical-portrait.jpg",
-    startingBid: 5500,
-    currentBid: 7200,
-    minIncrement: 250,
-    endTime: new Date(Date.now() + 18 * 60 * 60 * 1000), // 18 hours from now
-    highestBidder: "ClassicalArt_Patron",
-    bidHistory: [
+    image_url: "/renaissance-style-oil-painting-classical-portrait.jpg",
+    starting_bid: 5500,
+    current_bid: 7200,
+    min_increment: 250,
+    end_time: new Date(Date.now() + 18 * 60 * 60 * 1000), // 18 hours from now
+    highest_bidder: "ClassicalArt_Patron",
+    bid_history: [
       {
         id: "9",
-        artworkId: "6",
-        bidderName: "ClassicalArt_Patron",
+        artwork: "6",
+        bidder: "ClassicalArt_Patron",
         amount: 7200,
         timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
+        bidder_name: ""
       },
     ],
   },
-]
+];
 
 export const mockUserBids: UserBid[] = [
   {
@@ -207,4 +220,4 @@ export const mockUserBids: UserBid[] = [
     myHighestBid: 1800,
     status: "active",
   },
-]
+];
