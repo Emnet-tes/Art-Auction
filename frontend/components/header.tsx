@@ -35,7 +35,7 @@ export function Header() {
               My Bids
             </Link>
             <Link
-              href="/won-items"
+              href="/won"
               className="text-sm font-medium transition-colors hover:text-primary"
             >
               Won Items
@@ -88,7 +88,7 @@ export function Header() {
                 My Bids
               </Link>
               <Link
-                href="/won-items"
+                href="/won"
                 className="text-sm font-medium transition-colors hover:text-primary"
                 onClick={() => setIsMenuOpen(false)}
               >
