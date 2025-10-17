@@ -1,6 +1,5 @@
 "use client";
-
-import { use, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -24,9 +23,12 @@ export default function SignupPage() {
 
       toast.success("Account created! Please login.");
       router.push("/auth/login");
-    } catch (err: any) {
-        console.log(err);
-      toast.error(err.message || "Signup failed");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        toast.error(err.message || "Signup failed");
+      } else {
+        toast.error("Signup failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -70,7 +72,7 @@ export default function SignupPage() {
           Already have an account?{" "}
           <span
             className="text-blue-600 cursor-pointer"
-            onClick={() => router.push("/login")}
+            onClick={() => router.push("/auth/login")}
           >
             Login
           </span>

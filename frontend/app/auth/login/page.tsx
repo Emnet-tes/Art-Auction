@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { login } from "@/app/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,19 +10,27 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    setLoading(true);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      const data = await login({ username, password });
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
 
-      localStorage.setItem("access_token", data.access);
-      localStorage.setItem("refresh_token", data.refresh);
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.detail || "Invalid credentials");
+        return;
+      }
+
       toast.success("Logged in successfully!");
-      router.push("/dashboard");
-    } catch (err: any) {
-      toast.error(err.message || "Login failed");
-    } finally {
-      setLoading(false);
+      router.push("/home");
+    } catch (error) {
+      console.error(error);
+      toast.error("Something went wrong");
     }
   };
 
@@ -49,7 +56,8 @@ export default function LoginPage() {
           <button
             onClick={handleLogin}
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md transition-colors"
+            type="submit"
+            className="cursor-pointer w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md transition-colors"
           >
             {loading ? "Logging in..." : "Login"}
           </button>
