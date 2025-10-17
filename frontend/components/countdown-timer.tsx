@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 // Optionally import Box, Paper from "@mui/material" and use for wrappers
 
 interface CountdownTimerProps {
-  endTime: Date;
+  end_time: Date;
   compact?: boolean;
   className?: string;
   onExpire?: () => void;
@@ -22,7 +22,7 @@ interface TimeRemaining {
 }
 
 export function CountdownTimer({
-  endTime,
+  end_time,
   compact = false,
   className,
   onExpire,
@@ -40,7 +40,7 @@ export function CountdownTimer({
   useEffect(() => {
     const calculateTimeRemaining = () => {
       const now = new Date().getTime();
-      const end = endTime.getTime();
+      const end = end_time.getTime();
       const difference = end - now;
 
       if (difference <= 0) {
@@ -73,7 +73,7 @@ export function CountdownTimer({
     const interval = setInterval(calculateTimeRemaining, 1000);
 
     return () => clearInterval(interval);
-  }, [endTime, onExpire]);
+  }, [end_time, onExpire]);
 
   // Check if auction is ending soon (less than 10 minutes)
   const isEndingSoon =
@@ -146,7 +146,7 @@ export function CountdownTimer({
 
 // Extended version for detail pages
 export function DetailedCountdownTimer({
-  endTime,
+  end_time,
   onExpire,
 }: CountdownTimerProps) {
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining>({
@@ -162,7 +162,7 @@ export function DetailedCountdownTimer({
   useEffect(() => {
     const calculateTimeRemaining = () => {
       const now = new Date().getTime();
-      const end = endTime.getTime();
+      const end = end_time.getTime();
       const difference = end - now;
 
       if (difference <= 0) {
@@ -192,7 +192,7 @@ export function DetailedCountdownTimer({
     const interval = setInterval(calculateTimeRemaining, 1000);
 
     return () => clearInterval(interval);
-  }, [endTime, onExpire]);
+  }, [end_time, onExpire]);
 
   const isEndingSoon =
     timeRemaining.total <= 10 * 60 * 1000 && timeRemaining.total > 0;
@@ -289,8 +289,8 @@ export function DetailedCountdownTimer({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Auction ends on {endTime.toLocaleDateString()} at{" "}
-        {endTime.toLocaleTimeString()}
+        Auction ends on {end_time.toLocaleDateString()} at{" "}
+        {end_time.toLocaleTimeString()}
       </p>
     </div>
   );

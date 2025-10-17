@@ -10,17 +10,9 @@ from .serializers import ArtworkSerializer, BidSerializer, BidCreateSerializer
 from decimal import Decimal
 from bson.decimal128 import Decimal128
 from django.forms.models import model_to_dict
-
-
-class ArtworkListCreateView(generics.ListCreateAPIView):
-    queryset = Artwork.objects.all()
-    serializer_class = ArtworkSerializer
-    permission_classes = [IsAuthenticated]  # Require auth for creating
-
-class ArtworkDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Artwork.objects.all()
-    serializer_class = ArtworkSerializer
-    permission_classes = [IsAuthenticated]
+from django.http import Http404
+from bson.objectid import ObjectId
+import base64
 
 def to_decimal(value):
         """Convert any Decimal128 to Python Decimal."""
@@ -32,6 +24,111 @@ def to_decimal(value):
             return Decimal(0)
         else:
             return Decimal(str(value))
+
+# New: resolve various id formats used by the frontend (safe for routing)
+def resolve_artwork_by_id(raw_id):
+    """
+    Try multiple strategies to find the Artwork corresponding to raw_id:
+     - direct pk/id/_id matches
+     - 24-hex ObjectId
+     - base64url -> bytes -> ObjectId (12 bytes) or decoded utf-8 string
+    Raises Http404 if not found.
+    """
+    if not raw_id and raw_id != 0:
+        raise Http404("Artwork id missing")
+
+    # 1) direct lookups (pk / id / _id)
+    # 1) direct lookups (pk / id / _id)
+    for field in ("pk", "id", "_id"):
+        try:
+            if field == "pk":
+                return Artwork.objects.get(pk=raw_id)
+            else:
+                # Try direct match
+                kwargs = {field: raw_id}
+                try:
+                    return Artwork.objects.get(**kwargs)
+                except Exception:
+                    # If it's base64url, try converting to base64 and Binary
+                    if isinstance(raw_id, str):
+                        b64 = raw_id.replace("-", "+").replace("_", "/")
+                        pad = (-len(b64)) % 4
+                        if pad:
+                            b64 += "=" * pad
+                        import base64
+                        from bson.binary import Binary
+                        try:
+                            decoded = base64.b64decode(b64)
+                            b = Binary(decoded, 3)
+                            kwargs = {field: b}
+                            return Artwork.objects.get(**kwargs)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+
+    # 2) try hex ObjectId (24 hex chars)
+    try:
+        if isinstance(raw_id, str) and len(raw_id) == 24 and all(c in "0123456789abcdefABCDEF" for c in raw_id):
+            try:
+                return Artwork.objects.get(_id=ObjectId(raw_id))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 3) try base64url decode -> bytes
+    try:
+        s = str(raw_id)
+        # convert base64url to base64
+        b64 = s.replace("-", "+").replace("_", "/")
+        # pad
+        pad = (-len(b64)) % 4
+        if pad:
+            b64 += "=" * pad
+        decoded = base64.b64decode(b64)
+        # if 12 bytes, try ObjectId from bytes
+        if len(decoded) == 12:
+            try:
+                return Artwork.objects.get(_id=ObjectId(decoded))
+            except Exception:
+                pass
+        # try decoded bytes as utf-8 string id
+        try:
+            decoded_str = decoded.decode("utf-8")
+            for field in ("id", "_id"):
+                try:
+                    kwargs = {field: decoded_str}
+                    return Artwork.objects.get(**kwargs)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    # not found
+    raise Http404("Artwork not found")
+
+class ArtworkListCreateView(generics.ListCreateAPIView):
+    queryset = Artwork.objects.all()
+    serializer_class = ArtworkSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAuthenticated()]
+        return []
+
+class ArtworkDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Artwork.objects.all()
+    serializer_class = ArtworkSerializer
+    # permission_classes = [IsAuthenticated]
+
+    # Override to support frontend normalized ids
+    def get_object(self):
+        raw_pk = self.kwargs.get(self.lookup_field or "pk")
+        return resolve_artwork_by_id(raw_pk)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -72,7 +169,9 @@ def create_bid(request):
 
 @api_view(['GET'])
 def artwork_bids(request, artwork_id):
-    bids = Bid.objects.filter(artwork_id=artwork_id)
+    # Resolve the artwork using the flexible resolver, then fetch bids
+    artwork = resolve_artwork_by_id(artwork_id)
+    bids = Bid.objects.filter(artwork=artwork)
     serializer = BidSerializer(bids, many=True)
     return Response(serializer.data)
 
@@ -86,8 +185,6 @@ def my_bids(request):
     bids = Bid.objects.filter(bidder=user).select_related('artwork')
     serializer = BidSerializer(bids, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
-
-
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])

@@ -47,13 +47,24 @@ class BidCreateSerializer(serializers.Serializer):
         except Artwork.DoesNotExist:
             raise serializers.ValidationError("Artwork does not exist.")
 
+        print("Artwork current bid:", artwork.current_bid)
+        print("Artwork min increment:", artwork.min_increment)
+
         if artwork.end_time <= timezone.now():
             raise serializers.ValidationError("Auction has ended.")
 
-        current_bid = Decimal(str(artwork.current_bid))
-        min_increment = Decimal(str(artwork.min_increment))
-        min_bid = current_bid + min_increment
-        amount = Decimal(str(data['amount']))
+        try:
+            current_bid = Decimal(str(artwork.current_bid))
+            min_increment = Decimal(str(artwork.min_increment))
+            min_bid = current_bid + min_increment
+
+            amount = Decimal(str(data['amount']))
+        except Exception as e:
+            print("Decimal conversion error:", e)
+            raise serializers.ValidationError("Invalid decimal conversion")
+
+        print("Calculated min bid:", min_bid)
+        print("Incoming bid amount:", amount)
 
         if amount < min_bid:
             raise serializers.ValidationError(f"Bid must be at least {min_bid}.")

@@ -1,44 +1,67 @@
-import axios from "axios";
+const API_BASE = "http://localhost:8000/api";
 
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
-  headers: { "Content-Type": "application/json" },
-});
-// ✅ Attach access token
-api.interceptors.request.use((config) => {
-  const accessToken = localStorage.getItem("access");
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
+const getAuthHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
   }
-  return config;
-});
+  return {};
+};
 
-// 🔁 Refresh on 401
-api.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    const original = error.config;
+export async function fetchArtworks() {
+  const res = await fetch(`${API_BASE}/artworks/`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch artworks");
+  return res.json();
+}
 
-    if (error.response?.status === 401 && !original._retry) {
-      original._retry = true;
-      try {
-        const refreshRes = await fetch("/api/refresh/", { method: "POST" });
-        if (!refreshRes.ok) throw new Error("Failed to refresh");
+export async function fetchArtwork(id: string) {
+  const res = await fetch(`${API_BASE}/artworks/${id}/`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch artwork");
+  return res.json();
+}
 
-        const { access } = await refreshRes.json();
-        localStorage.setItem("access", access);
+export async function createBid(artworkId: string, amount: number) {
+  const res = await fetch(`${API_BASE}/bids/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ artwork_id: artworkId, amount }),
+  });
+  if (!res.ok) throw new Error("Failed to create bid");
+  return res.json();
+}
 
-        original.headers.Authorization = `Bearer ${access}`;
-        return api(original);
-      } catch (err) {
-        // logout fallback
-        localStorage.removeItem("access");
-        window.location.href = "/login";
-      }
-    }
+export async function fetchArtworkBids(artworkId: string) {
+  const res = await fetch(`${API_BASE}/bids/${artworkId}/`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch bids");
+  return res.json();
+}
 
-    return Promise.reject(error);
-  }
-);
+export async function fetchMyBids() {
+  const res = await fetch(`${API_BASE}/bids/my`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch my bids");
+  return res.json();
+}
 
-export default api;
+// Add login function for auth
+export async function login(username: string, password: string) {
+  const res = await fetch(`${API_BASE}/auth/login/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) throw new Error("Login failed");
+  const data = await res.json();
+  localStorage.setItem("token", data.access); // Assuming JWT
+  return data;
+}
