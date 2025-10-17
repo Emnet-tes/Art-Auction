@@ -65,27 +65,3 @@ class BidCreateSerializer(serializers.Serializer):
 
         data['amount'] = amount
         return data
-    artwork_id = serializers.UUIDField()
-    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    print(amount)
-    def validate(self, data):
-        print("Raw incoming data:", data)
-        artwork = Artwork.objects.get(id=data['artwork_id'])
-
-        if artwork.end_time <= timezone.now():
-            raise serializers.ValidationError("Auction has ended.")
-
-        # Convert Decimal128 to Decimal
-        current_bid = Decimal(str(artwork.current_bid))
-        min_increment = Decimal(str(artwork.min_increment))
-        min_bid = current_bid + min_increment
-
-        # Convert amount to Decimal in case it comes as string
-        amount = Decimal(data['amount'])
-
-        if amount < min_bid:
-            raise serializers.ValidationError(f"Bid must be at least {min_bid}.")
-        
-        # Put the converted Decimal back into validated data
-        data['amount'] = amount
-        return data
