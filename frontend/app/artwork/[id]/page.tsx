@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import { fetchArtwork, fetchArtworkBids } from "@/lib/api"; // Added
 import type { Artwork, Bid } from "@/lib/mock-data"; // Added
+import Loading from "@/components/Loading";
 
 interface ArtworkDetailPageProps {
   params: {
@@ -48,7 +49,7 @@ export default function ArtworkDetailPage({ params }: ArtworkDetailPageProps) {
     loadData();
   }, [params.id]); // Added
 
-  if (loading || !artwork) return <div>Loading...</div>; // Added
+  if (loading || !artwork) return <Loading />; // Updated
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-US", {

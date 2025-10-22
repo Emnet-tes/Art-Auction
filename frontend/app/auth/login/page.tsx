@@ -20,7 +20,7 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
-
+      localStorage.setItem("token", data.token);
       if (!res.ok) {
         toast.error(data.detail || "Invalid credentials");
         return;
