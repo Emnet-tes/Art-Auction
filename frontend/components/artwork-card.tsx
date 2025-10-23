@@ -24,7 +24,7 @@ export function ArtworkCard({ artwork }: ArtworkCardProps) {
     <Card className="group overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
       <div className="relative aspect-[4/3] overflow-hidden">
         <Image
-          src={artwork.imageUrl || "/placeholder.svg"}
+          src={artwork.image_url || "/placeholder.svg"}
           alt={artwork.title}
           fill
           className="object-cover transition-transform duration-300 group-hover:scale-105"
@@ -58,7 +58,7 @@ export function ArtworkCard({ artwork }: ArtworkCardProps) {
 
         {/* Countdown Timer Overlay */}
         <div className="absolute bottom-3 left-3 right-3">
-          <CountdownTimer endTime={artwork.endTime} compact />
+          <CountdownTimer end_time={artwork.end_time} compact />
         </div>
       </div>
 
@@ -77,14 +77,14 @@ export function ArtworkCard({ artwork }: ArtworkCardProps) {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Current Bid</span>
               <span className="font-semibold text-lg">
-                {formatPrice(artwork.currentBid)}
+                {formatPrice(artwork.current_bid)}
               </span>
             </div>
 
-            {artwork.highestBidder && (
+            {artwork.highest_bidder && (
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>Leading bidder</span>
-                <span>{artwork.highestBidder}</span>
+                <span>{artwork.highest_bidder}</span>
               </div>
             )}
           </div>
