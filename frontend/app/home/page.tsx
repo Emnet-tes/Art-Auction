@@ -9,166 +9,206 @@ export default function HomePage() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadArtworks = async () => {
-      try {
-        const data = await fetchArtworks();
+  // --- NEW: modal + form state ---
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({
+    title: "",
+    artist: "",
+    description: "",
+    category: "",
+    starting_bid: "",
+    image_url: "",
+    end_time: "",
+  });
+  const [formError, setFormError] = useState<string | null>(null);
 
-        // Helper: convert bytes -> base64url
-        const bytesToBase64Url = (bytes: number[]) => {
-          // create binary string from bytes
-          let bin = "";
-          for (let i = 0; i < bytes.length; i++)
-            bin += String.fromCharCode(bytes[i]);
-          const b64 =
-            typeof btoa === "function"
-              ? btoa(bin)
-              : Buffer.from(bin, "binary").toString("base64");
-          return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-        };
+  // --- Hoist loadArtworks so we can reuse it after creation ---
+  const loadArtworks = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchArtworks();
 
-        // Helper: produce a stable, URL-safe id
-        const normalizeId = (raw: any) => {
-          if (!raw && raw !== 0) return "";
-
-          // If it's an object with toHexString (Mongo ObjectId), use that
-          if (typeof raw === "object" && raw !== null) {
-            if (typeof (raw as any).toHexString === "function") {
-              return (raw as any).toHexString();
-            }
-            // Buffer-like (Node) -> convert to base64url
-            if (
-              typeof (raw as any).toString === "function" &&
-              (raw as any).buffer instanceof ArrayBuffer
-            ) {
-              const buf = Buffer.from((raw as any).buffer);
-              return buf
-                .toString("base64")
-                .replace(/\+/g, "-")
-                .replace(/\//g, "_")
-                .replace(/=+$/, "");
-            }
-          }
-
-          const s = String(raw);
-
-          // Binary.createFromBase64('BASE64', ...)
-          const matchBase64 = s.match(
-            /Binary\.createFromBase64\('([A-Za-z0-9+/=]+)'\)/
-          );
-          if (matchBase64) {
-            const base64 = matchBase64[1];
-            return base64
+      // reuse normalization logic (kept concise here)
+      const bytesToBase64Url = (bytes: number[]) => {
+        let bin = "";
+        for (let i = 0; i < bytes.length; i++)
+          bin += String.fromCharCode(bytes[i]);
+        const b64 =
+          typeof btoa === "function"
+            ? btoa(bin)
+            : Buffer.from(bin, "binary").toString("base64");
+        return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      };
+      const normalizeId = (raw: any) => {
+        if (!raw && raw !== 0) return "";
+        if (typeof raw === "object" && raw !== null) {
+          if (typeof (raw as any).toHexString === "function")
+            return (raw as any).toHexString();
+          if (
+            typeof (raw as any).toString === "function" &&
+            (raw as any).buffer instanceof ArrayBuffer
+          ) {
+            const buf = Buffer.from((raw as any).buffer);
+            return buf
+              .toString("base64")
               .replace(/\+/g, "-")
               .replace(/\//g, "_")
               .replace(/=+$/, "");
           }
-
-          // Escaped hex sequences like b'\x97\x1a...' or sequences with \xHH
-          if (/\\x[0-9A-Fa-f]{2}/.test(s)) {
-            const bytes: number[] = [];
-            const re = /\\x([0-9A-Fa-f]{2})/g;
-            let m;
-            while ((m = re.exec(s)) !== null) {
-              bytes.push(parseInt(m[1], 16));
+        }
+        const s = String(raw);
+        const matchBase64 = s.match(
+          /Binary\.createFromBase64\('([A-Za-z0-9+/=]+)'\)/
+        );
+        if (matchBase64)
+          return matchBase64[1]
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=+$/, "");
+        if (/\\x[0-9A-Fa-f]{2}/.test(s)) {
+          const bytes: number[] = [];
+          const re = /\\x([0-9A-Fa-f]{2})/g;
+          let m;
+          while ((m = re.exec(s)) !== null) bytes.push(parseInt(m[1], 16));
+          if (bytes.length) return bytesToBase64Url(bytes);
+        }
+        if (
+          /^[A-Za-z0-9+/=]+$/.test(s) &&
+          (s.endsWith("=") || /[+/]/.test(s))
+        ) {
+          return s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        }
+        try {
+          const encoded = encodeURIComponent(s);
+          const bytes: number[] = [];
+          for (let i = 0; i < encoded.length; ) {
+            if (encoded[i] === "%") {
+              const hex = encoded.slice(i + 1, i + 3);
+              bytes.push(parseInt(hex, 16));
+              i += 3;
+            } else {
+              bytes.push(encoded.charCodeAt(i));
+              i++;
             }
-            if (bytes.length) return bytesToBase64Url(bytes);
           }
+          return bytesToBase64Url(bytes);
+        } catch {
+          return encodeURIComponent(s);
+        }
+      };
 
-          // If string looks like raw base64 (ends with == or contains +/), convert to base64url
-          if (
-            /^[A-Za-z0-9+/=]+$/.test(s) &&
-            (s.endsWith("=") || /[+/]/.test(s))
-          ) {
-            return s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-          }
-
-          // Fallback: base64url of the UTF-8 encoded string
-          try {
-            // encodeURIComponent -> percent-escapes -> convert to bytes
-            const encoded = encodeURIComponent(s);
-            const bytes: number[] = [];
-            for (let i = 0; i < encoded.length; ) {
-              if (encoded[i] === "%") {
-                const hex = encoded.slice(i + 1, i + 3);
-                bytes.push(parseInt(hex, 16));
-                i += 3;
-              } else {
-                bytes.push(encoded.charCodeAt(i));
-                i++;
-              }
-            }
-            return bytesToBase64Url(bytes);
-          } catch {
-            return encodeURIComponent(s);
-          }
+      const normalized = (data || []).map((a: any) => {
+        const item = { ...a };
+        const rawId = item._id ?? item.id;
+        item._id = rawId;
+        item.id = normalizeId(rawId ?? "");
+        const toDate = (val: any) => {
+          if (!val) return undefined;
+          if (val instanceof Date) return val;
+          const d = new Date(val);
+          return isNaN(d.getTime()) ? undefined : d;
         };
+        item.end_time = toDate(item.end_time ?? item.endTime) ?? item.end_time;
+        item.start_time =
+          toDate(item.start_time ?? item.startTime) ?? item.start_time;
+        const toNum = (v: any) => {
+          if (v === null || v === undefined) return v;
+          const n = typeof v === "number" ? v : parseFloat(String(v));
+          return Number.isFinite(n) ? n : v;
+        };
+        item.starting_bid = toNum(item.starting_bid);
+        item.current_bid = toNum(item.current_bid);
+        item.min_increment = toNum(item.min_increment);
+        if (typeof item.is_active === "string")
+          item.is_active = item.is_active === "true";
+        else item.is_active = Boolean(item.is_active);
+        if (item.image_url && typeof item.image_url !== "string") {
+          try {
+            item.image_url = String(item.image_url);
+          } catch {}
+        }
+        return item as Artwork;
+      });
 
-        // Thorough normalization so detail page receives stable types
-        const normalized = (data || []).map((a: any) => {
-          const item = { ...a };
+      setArtworks(normalized);
+    } catch (error) {
+      console.error("Failed to load artworks:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-          // Prefer _id for canonical id, otherwise id
-          const rawId = item._id ?? item.id;
-          item._id = rawId;
-          item.id = normalizeId(rawId);
-
-          // Convert time fields to Date instances (guard invalid dates)
-          const toDate = (val: any) => {
-            if (!val) return undefined;
-            if (val instanceof Date) return val;
-            const d = new Date(val);
-            return isNaN(d.getTime()) ? undefined : d;
-          };
-          item.end_time =
-            toDate(item.end_time ?? item.endTime) ?? item.end_time;
-          item.start_time =
-            toDate(item.start_time ?? item.startTime) ?? item.start_time;
-
-          // Parse numeric fields
-          const toNum = (v: any) => {
-            if (v === null || v === undefined) return v;
-            const n = typeof v === "number" ? v : parseFloat(String(v));
-            return Number.isFinite(n) ? n : v;
-          };
-          item.starting_bid = toNum(item.starting_bid);
-          item.current_bid = toNum(item.current_bid);
-          item.min_increment = toNum(item.min_increment);
-
-          // Coerce booleans
-          if (typeof item.is_active === "string") {
-            item.is_active = item.is_active === "true";
-          } else {
-            item.is_active = Boolean(item.is_active);
-          }
-
-          // Ensure image_url exists as string (detail pages and <Image> expect a string)
-          if (item.image_url && typeof item.image_url !== "string") {
-            try {
-              item.image_url = String(item.image_url);
-            } catch {
-              // leave as-is
-            }
-          }
-
-          return item as Artwork;
-        });
-
-        setArtworks(normalized);
-      } catch (error) {
-        console.error("Failed to load artworks:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  useEffect(() => {
     loadArtworks();
   }, []);
+
+  // --- create artwork handler ---
+  const createArtwork = async (e?: any) => {
+    if (e) e.preventDefault();
+    setFormError(null);
+    setCreating(true);
+    try {
+      const payload = {
+        title: form.title,
+        artist: form.artist,
+        description: form.description,
+        category: form.category,
+        starting_bid: form.starting_bid
+          ? parseFloat(form.starting_bid)
+          : undefined,
+        image_url: form.image_url,
+        end_time: form.end_time || undefined,
+      };
+      const res = await fetch("/api/artworks/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setFormError(err?.detail || err?.error || "Failed to create artwork");
+        setCreating(false);
+        return;
+      }
+      // reload artworks and close modal
+      await loadArtworks();
+      setShowCreateModal(false);
+      setForm({
+        title: "",
+        artist: "",
+        description: "",
+        category: "",
+        starting_bid: "",
+        image_url: "",
+        end_time: "",
+      });
+    } catch (err) {
+      console.error(err);
+      setFormError("Network error");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   if (loading) return <div>Loading...</div>;
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
+
+      {/* NEW: Create Artwork button (next to hero) */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <div className="flex justify-center">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:opacity-90"
+          >
+            Create Artwork
+          </button>
+        </div>
+      </div>
 
       {/* Hero Section */}
       <section className="relative py-20 px-4 sm:px-6 lg:px-8">
@@ -191,6 +231,110 @@ export default function HomePage() {
           <ArtworkGallery artworks={artworks} />
         </div>
       </section>
+
+      {/* Modal (simple) */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg max-w-xl w-full p-6 mx-4">
+            <h2 className="text-xl font-semibold mb-4">Create Artwork</h2>
+            <form onSubmit={createArtwork} className="space-y-3">
+              <div>
+                <label className="block text-sm">Title</label>
+                <input
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  className="w-full border rounded px-2 py-1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm">Artist</label>
+                <input
+                  value={form.artist}
+                  onChange={(e) => setForm({ ...form, artist: e.target.value })}
+                  className="w-full border rounded px-2 py-1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm">Description</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
+                  className="w-full border rounded px-2 py-1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm">Category</label>
+                  <input
+                    value={form.category}
+                    onChange={(e) =>
+                      setForm({ ...form, category: e.target.value })
+                    }
+                    className="w-full border rounded px-2 py-1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm">Starting Bid</label>
+                  <input
+                    type="number"
+                    value={form.starting_bid}
+                    onChange={(e) =>
+                      setForm({ ...form, starting_bid: e.target.value })
+                    }
+                    className="w-full border rounded px-2 py-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm">Image URL</label>
+                <input
+                  value={form.image_url}
+                  onChange={(e) =>
+                    setForm({ ...form, image_url: e.target.value })
+                  }
+                  className="w-full border rounded px-2 py-1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm">End time (ISO)</label>
+                <input
+                  value={form.end_time}
+                  onChange={(e) =>
+                    setForm({ ...form, end_time: e.target.value })
+                  }
+                  placeholder="2025-10-05T18:40:00Z"
+                  className="w-full border rounded px-2 py-1"
+                />
+              </div>
+
+              {formError && (
+                <div className="text-sm text-red-600">{formError}</div>
+              )}
+
+              <div className="flex justify-end gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-3 py-1 rounded border"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="px-4 py-2 bg-primary text-white rounded"
+                >
+                  {creating ? "Creating..." : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

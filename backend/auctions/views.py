@@ -29,15 +29,30 @@ def to_decimal(value):
 def resolve_artwork_by_id(raw_id):
     """
     Try multiple strategies to find the Artwork corresponding to raw_id:
+     - 24-hex ObjectId -> lookup by _id field (MongoDB) - CHECKED FIRST
      - direct pk/id/_id matches
-     - 24-hex ObjectId
      - base64url -> bytes -> ObjectId (12 bytes) or decoded utf-8 string
     Raises Http404 if not found.
     """
     if not raw_id and raw_id != 0:
         raise Http404("Artwork id missing")
 
-    # 1) direct lookups (pk / id / _id)
+    try:
+        if isinstance(raw_id, str) and len(raw_id) == 24 and all(c in "0123456789abcdefABCDEF" for c in raw_id):
+            oid = ObjectId(raw_id)
+            # Try to find by _id (MongoDB field where Djongo stores the ObjectId)
+            try:
+                return Artwork.objects.get(_id=oid)
+            except Artwork.DoesNotExist:
+                pass
+            # Also try by id field as fallback
+            try:
+                return Artwork.objects.get(id=oid)
+            except Artwork.DoesNotExist:
+                pass
+    except Exception:
+        pass
+
     # 1) direct lookups (pk / id / _id)
     for field in ("pk", "id", "_id"):
         try:
@@ -67,18 +82,7 @@ def resolve_artwork_by_id(raw_id):
         except Exception:
             pass
 
-
-    # 2) try hex ObjectId (24 hex chars)
-    try:
-        if isinstance(raw_id, str) and len(raw_id) == 24 and all(c in "0123456789abcdefABCDEF" for c in raw_id):
-            try:
-                return Artwork.objects.get(_id=ObjectId(raw_id))
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-    # 3) try base64url decode -> bytes
+    # 2) try base64url decode -> bytes
     try:
         s = str(raw_id)
         # convert base64url to base64
@@ -110,6 +114,7 @@ def resolve_artwork_by_id(raw_id):
 
     # not found
     raise Http404("Artwork not found")
+
 
 class ArtworkListCreateView(generics.ListCreateAPIView):
     queryset = Artwork.objects.all()
