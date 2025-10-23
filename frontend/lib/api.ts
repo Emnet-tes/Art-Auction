@@ -22,7 +22,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
       try {
-        const refreshResponse = await fetch("/api/refresh/", { method: "POST" });
+        const refreshResponse = await fetch("/api/refresh/", {
+          method: "POST",
+        });
         if (!refreshResponse.ok) throw new Error("Failed to refresh token");
         const { access } = await refreshResponse.json();
         localStorage.setItem("access", access);
@@ -81,6 +83,20 @@ export const login = async (username: string, password: string) => {
 export const logout = async () => {
   localStorage.removeItem("access");
   window.location.href = "/auth/login";
+};
+
+export const createArtwork = async (payload: {
+  title: string;
+  artist: string;
+  description?: string;
+  category?: string;
+  starting_bid?: number;
+  min_increment?: number;
+  image_url?: string;
+  end_time?: string;
+}) => {
+  const { data } = await api.post("/artworks/", payload);
+  return data;
 };
 
 export default api;

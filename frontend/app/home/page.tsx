@@ -2,11 +2,13 @@
 import { useState, useEffect } from "react";
 import { Header } from "@/components/header";
 import { ArtworkGallery } from "@/components/artwork-gallery";
-import { fetchArtworks } from "@/lib/api";
+import { fetchArtworks, createArtwork as apiCreateArtwork } from "@/lib/api";
 import type { Artwork } from "@/lib/mock-data";
 import Loading from "@/components/Loading";
+import axios from "axios";
 
 export default function HomePage() {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,10 +21,19 @@ export default function HomePage() {
     description: "",
     category: "",
     starting_bid: "",
+    min_increment: "", // <-- added
     image_url: "",
     end_time: "",
   });
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Add category choices for the create modal
+  const CATEGORY_CHOICES = [
+    { value: "Painting", label: "Painting" },
+    { value: "Sculpture", label: "Sculpture" },
+    { value: "Digital", label: "Digital" },
+    { value: "Photography", label: "Photography" },
+  ];
 
   // --- Hoist loadArtworks so we can reuse it after creation ---
   const loadArtworks = async () => {
@@ -144,7 +155,7 @@ export default function HomePage() {
     loadArtworks();
   }, []);
 
-  // --- create artwork handler ---
+  // inside createArtwork handler
   const createArtwork = async (e?: any) => {
     if (e) e.preventDefault();
     setFormError(null);
@@ -158,22 +169,20 @@ export default function HomePage() {
         starting_bid: form.starting_bid
           ? parseFloat(form.starting_bid)
           : undefined,
+        min_increment: form.min_increment
+          ? parseFloat(form.min_increment)
+          : undefined, // <-- include min_increment
         image_url: form.image_url,
-        end_time: form.end_time || undefined,
+        end_time: form.end_time
+          ? new Date(form.end_time).toISOString() // <-- convert datetime-local to ISO
+          : undefined,
       };
-      const res = await fetch("/api/artworks/", {
-        method: "POST",
+      const res = await axios.post(`${API_URL}/artworks/`, payload, {
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
+        withCredentials: true,
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        setFormError(err?.detail || err?.error || "Failed to create artwork");
-        setCreating(false);
-        return;
-      }
-      // reload artworks and close modal
+
+      // reload artworks and reset form
       await loadArtworks();
       setShowCreateModal(false);
       setForm({
@@ -182,12 +191,13 @@ export default function HomePage() {
         description: "",
         category: "",
         starting_bid: "",
+        min_increment: "", // <-- reset min_increment
         image_url: "",
         end_time: "",
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setFormError("Network error");
+      setFormError(err.response?.data?.detail || "Network error");
     } finally {
       setCreating(false);
     }
@@ -267,16 +277,49 @@ export default function HomePage() {
                   className="w-full border rounded px-2 py-1"
                 />
               </div>
+               <div>
+                <label className="block text-sm">Image URL</label>
+                <input
+                  value={form.image_url}
+                  onChange={(e) =>
+                    setForm({ ...form, image_url: e.target.value })
+                  }
+                  className="w-full border rounded px-2 py-1"
+                />
+              </div>
+              {/* Image preview */}
+              {form.image_url && (
+                <div className="mt-2">
+                  <p className="text-sm text-muted-foreground mb-1">Preview:</p>
+                  <div className="w-full h-48 bg-gray-50 flex items-center justify-center overflow-hidden rounded">
+                    <img
+                      src={form.image_url}
+                      alt="Artwork preview"
+                      style={{ maxWidth: "100%", maxHeight: "100%" }}
+                      onError={(e: any) => {
+                        e.currentTarget.src = "";
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm">Category</label>
-                  <input
+                  <select
                     value={form.category}
                     onChange={(e) =>
                       setForm({ ...form, category: e.target.value })
                     }
                     className="w-full border rounded px-2 py-1"
-                  />
+                  >
+                    <option value="">Select category</option>
+                    {CATEGORY_CHOICES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm">Starting Bid</label>
@@ -290,26 +333,35 @@ export default function HomePage() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm">Image URL</label>
-                <input
-                  value={form.image_url}
-                  onChange={(e) =>
-                    setForm({ ...form, image_url: e.target.value })
-                  }
-                  className="w-full border rounded px-2 py-1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm">End time (ISO)</label>
-                <input
-                  value={form.end_time}
-                  onChange={(e) =>
-                    setForm({ ...form, end_time: e.target.value })
-                  }
-                  placeholder="2025-10-05T18:40:00Z"
-                  className="w-full border rounded px-2 py-1"
-                />
+
+              {/* NEW: min increment and end time row */}
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <div>
+                  <label className="block text-sm">Min Increment</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={form.min_increment}
+                    onChange={(e) =>
+                      setForm({ ...form, min_increment: e.target.value })
+                    }
+                    className="w-full border rounded px-2 py-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm">
+                    End time (date & time)
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={form.end_time}
+                    onChange={(e) =>
+                      setForm({ ...form, end_time: e.target.value })
+                    }
+                    className="w-full border rounded px-2 py-1"
+                  />
+                </div>
               </div>
 
               {formError && (

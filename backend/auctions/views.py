@@ -13,6 +13,7 @@ from django.forms.models import model_to_dict
 from django.http import Http404
 from bson.objectid import ObjectId
 import base64
+import uuid 
 
 def to_decimal(value):
         """Convert any Decimal128 to Python Decimal."""
@@ -28,100 +29,79 @@ def to_decimal(value):
 # New: resolve various id formats used by the frontend (safe for routing)
 def resolve_artwork_by_id(raw_id):
     """
-    Try multiple strategies to find the Artwork corresponding to raw_id:
-     - 24-hex ObjectId -> lookup by _id field (MongoDB) - CHECKED FIRST
-     - direct pk/id/_id matches
-     - base64url -> bytes -> ObjectId (12 bytes) or decoded utf-8 string
-    Raises Http404 if not found.
+    Resolve an Artwork by either:
+    - UUID string (normal Django UUID)
+    - ObjectId (MongoDB _id)
+    Uses MongoDB connection directly to bypass Djongo UUID conversion issues
     """
-    if not raw_id and raw_id != 0:
+    if not raw_id:
         raise Http404("Artwork id missing")
 
-    try:
-        if isinstance(raw_id, str) and len(raw_id) == 24 and all(c in "0123456789abcdefABCDEF" for c in raw_id):
-            oid = ObjectId(raw_id)
-            # Try to find by _id (MongoDB field where Djongo stores the ObjectId)
-            try:
-                return Artwork.objects.get(_id=oid)
-            except Artwork.DoesNotExist:
-                pass
-            # Also try by id field as fallback
-            try:
-                return Artwork.objects.get(id=oid)
-            except Artwork.DoesNotExist:
-                pass
-    except Exception:
-        pass
+    print(f"\n[v0] ===== UUID RESOLUTION DEBUG =====")
+    print(f"[v0] Frontend sent: {raw_id}")
+    print(f"[v0] Type: {type(raw_id)}")
 
-    # 1) direct lookups (pk / id / _id)
-    for field in ("pk", "id", "_id"):
-        try:
-            if field == "pk":
-                return Artwork.objects.get(pk=raw_id)
+    # --- 1) Try regular UUID format using MongoDB connection directly ---
+    try:
+        parsed_uuid = uuid.UUID(str(raw_id))
+        print(f"[v0] Parsed as UUID: {parsed_uuid}")
+        
+        # Convert UUID to BSON Binary for MongoDB query
+        uuid_binary = Binary(parsed_uuid.bytes, subtype=3)
+        print(f"[v0] UUID binary: {uuid_binary}")
+        
+        # Get MongoDB connection and query directly
+        from django.db import connections
+        db = connections['default'].get_database()
+        
+        # Query the artworks collection directly
+        artwork_doc = db['auctions_artwork'].find_one({"id": uuid_binary})
+        
+        if artwork_doc:
+            print(f"[v0] ✓ Found artwork document in MongoDB!")
+            # Convert MongoDB document back to Django model
+            artwork = Artwork.objects.filter(id=parsed_uuid).first()
+            if artwork:
+                print(f"[v0] ✓ Successfully retrieved Django model!")
+                return artwork
             else:
-                # Try direct match
-                kwargs = {field: raw_id}
-                try:
-                    return Artwork.objects.get(**kwargs)
-                except Exception:
-                    # If it's base64url, try converting to base64 and Binary
-                    if isinstance(raw_id, str):
-                        b64 = raw_id.replace("-", "+").replace("_", "/")
-                        pad = (-len(b64)) % 4
-                        if pad:
-                            b64 += "=" * pad
-                        import base64
-                        from bson.binary import Binary
-                        try:
-                            decoded = base64.b64decode(b64)
-                            b = Binary(decoded, 3)
-                            kwargs = {field: b}
-                            return Artwork.objects.get(**kwargs)
-                        except Exception:
-                            pass
-        except Exception:
-            pass
+                print(f"[v0] ✗ Found in MongoDB but failed to retrieve Django model")
+        else:
+            print(f"[v0] ✗ UUID not found in MongoDB")
+    except Exception as e:
+        print(f"[v0] ✗ UUID lookup failed: {type(e).__name__}: {str(e)}")
 
-    # 2) try base64url decode -> bytes
+    # --- 2) Try ObjectId format ---
     try:
-        s = str(raw_id)
-        # convert base64url to base64
-        b64 = s.replace("-", "+").replace("_", "/")
-        # pad
-        pad = (-len(b64)) % 4
-        if pad:
-            b64 += "=" * pad
-        decoded = base64.b64decode(b64)
-        # if 12 bytes, try ObjectId from bytes
-        if len(decoded) == 12:
-            try:
-                return Artwork.objects.get(_id=ObjectId(decoded))
-            except Exception:
-                pass
-        # try decoded bytes as utf-8 string id
-        try:
-            decoded_str = decoded.decode("utf-8")
-            for field in ("id", "_id"):
-                try:
-                    kwargs = {field: decoded_str}
-                    return Artwork.objects.get(**kwargs)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-    except Exception:
-        pass
+        obj_id = ObjectId(str(raw_id))
+        print(f"[v0] Parsed as ObjectId: {obj_id}")
+        artwork = Artwork.objects.filter(_id=obj_id).first()
+        if artwork:
+            print(f"[v0] ✓ Found artwork by ObjectId!")
+            return artwork
+        else:
+            print(f"[v0] ✗ ObjectId not found in database")
+    except Exception as e:
+        print(f"[v0] ✗ ObjectId lookup failed: {type(e).__name__}: {str(e)}")
 
-    # not found
+    # --- 3) Debug: Show all artworks in database ---
+    print(f"\n[v0] ===== DATABASE DEBUG =====")
+    try:
+        all_artworks = Artwork.objects.all()
+        print(f"[v0] Total artworks in database: {all_artworks.count()}")
+        for artwork in all_artworks:
+            print(f"[v0] - ID: {artwork.id} (type: {type(artwork.id).__name__})")
+            print(f"[v0]   Title: {artwork.title}")
+    except Exception as e:
+        print(f"[v0] ✗ Failed to list artworks: {type(e).__name__}: {str(e)}")
+
     raise Http404("Artwork not found")
-
-
 class ArtworkListCreateView(generics.ListCreateAPIView):
     queryset = Artwork.objects.all()
     serializer_class = ArtworkSerializer
 
     def get_permissions(self):
-        if self.request.method == 'POST':
+        if self.request.method == 'POSTs':
             return [IsAuthenticated()]
         return []
 
@@ -130,7 +110,6 @@ class ArtworkDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ArtworkSerializer
     # permission_classes = [IsAuthenticated]
 
-    # Override to support frontend normalized ids
     def get_object(self):
         raw_pk = self.kwargs.get(self.lookup_field or "pk")
         return resolve_artwork_by_id(raw_pk)
