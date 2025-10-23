@@ -4,6 +4,7 @@ import { Header } from "@/components/header";
 import { ArtworkGallery } from "@/components/artwork-gallery";
 import { fetchArtworks } from "@/lib/api";
 import type { Artwork } from "@/lib/mock-data";
+import Loading from "@/components/Loading";
 
 export default function HomePage() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
@@ -192,7 +193,7 @@ export default function HomePage() {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <Loading />;
 
   return (
     <div className="min-h-screen bg-background">

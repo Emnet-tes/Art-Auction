@@ -1,67 +1,86 @@
-const API_BASE = "http://localhost:8000/api";
+import axios from "axios";
 
-const getAuthHeaders = (): Record<string, string> => {
-  const token = localStorage.getItem("token");
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api",
+  headers: { "Content-Type": "application/json" },
+});
+
+// ✅ Attach access token from localStorage
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("access");
   if (token) {
-    return { Authorization: `Bearer ${token}` };
+    config.headers.Authorization = `Bearer ${token}`;
   }
-  return {};
+  return config;
+});
+
+// 🔁 Automatically refresh token on 401
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+    if (error.response?.status === 401 && !original._retry) {
+      original._retry = true;
+      try {
+        const refreshResponse = await fetch("/api/refresh/", { method: "POST" });
+        if (!refreshResponse.ok) throw new Error("Failed to refresh token");
+        const { access } = await refreshResponse.json();
+        localStorage.setItem("access", access);
+        original.headers.Authorization = `Bearer ${access}`;
+        return api(original);
+      } catch (err) {
+        localStorage.removeItem("access");
+        window.location.href = "/auth/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ========== API Endpoints ==========
+
+export const fetchArtworks = async () => {
+  const { data } = await api.get("/artworks/");
+  return data;
 };
 
-export async function fetchArtworks() {
-  const res = await fetch(`${API_BASE}/artworks/`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to fetch artworks");
-  return res.json();
-}
-
-export async function fetchArtwork(id: string) {
-  const res = await fetch(`${API_BASE}/artworks/${id}/`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to fetch artwork");
-  return res.json();
-}
-
-export async function createBid(artworkId: string, amount: number) {
-  const res = await fetch(`${API_BASE}/bids/`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify({ artwork_id: artworkId, amount }),
-  });
-  if (!res.ok) throw new Error("Failed to create bid");
-  return res.json();
-}
-
-export async function fetchArtworkBids(artworkId: string) {
-  const res = await fetch(`${API_BASE}/bids/${artworkId}/`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to fetch bids");
-  return res.json();
-}
-
-export async function fetchMyBids() {
-  const res = await fetch(`${API_BASE}/bids/my`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to fetch my bids");
-  return res.json();
-}
-
-// Add login function for auth
-export async function login(username: string, password: string) {
-  const res = await fetch(`${API_BASE}/auth/login/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) throw new Error("Login failed");
-  const data = await res.json();
-  localStorage.setItem("token", data.access); // Assuming JWT
+export const fetchArtwork = async (id: string) => {
+  const { data } = await api.get(`/artworks/${id}/`);
   return data;
-}
+};
+
+export const createBid = async (artworkId: string, amount: number) => {
+  const { data } = await api.post("/bids/", {
+    artwork_id: artworkId,
+    amount,
+  });
+  return data;
+};
+
+export const fetchArtworkBids = async (artworkId: string) => {
+  const { data } = await api.get(`/bids/${artworkId}/`);
+  return data;
+};
+
+export const fetchMyBids = async () => {
+  const { data } = await api.get("/bids/my");
+  return data;
+};
+
+export const fetchMyWonBids = async () => {
+  const { data } = await api.get("/bids/won");
+  return data;
+};
+
+export const login = async (username: string, password: string) => {
+  const { data } = await api.post("/auth/login/", { username, password });
+  localStorage.setItem("access", data.access);
+  return data;
+};
+
+export const logout = async () => {
+  localStorage.removeItem("access");
+  window.location.href = "/auth/login";
+};
+
+export default api;
