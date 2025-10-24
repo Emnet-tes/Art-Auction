@@ -158,8 +158,11 @@ def create_bid(request):
 
 @api_view(['GET'])
 def artwork_bids(request, artwork_id):
-    # Resolve the artwork using the flexible resolver, then fetch bids
-    artwork = resolve_artwork_by_id(artwork_id)
+    try:
+        artwork = Artwork.objects.get(id=artwork_id)
+    except Artwork.DoesNotExist:
+        return Response({'error': 'Artwork not found'}, status=status.HTTP_404_NOT_FOUND)
+
     bids = Bid.objects.filter(artwork=artwork)
     serializer = BidSerializer(bids, many=True)
     return Response(serializer.data)
