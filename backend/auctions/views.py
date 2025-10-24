@@ -101,7 +101,7 @@ class ArtworkListCreateView(generics.ListCreateAPIView):
     serializer_class = ArtworkSerializer
 
     def get_permissions(self):
-        if self.request.method == 'POSTs':
+        if self.request.method == 'POST':
             return [IsAuthenticated()]
         return []
 
