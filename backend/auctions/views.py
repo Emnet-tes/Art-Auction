@@ -11,7 +11,7 @@ from decimal import Decimal
 from bson.decimal128 import Decimal128
 from django.forms.models import model_to_dict
 from django.http import Http404
-from bson.objectid import ObjectId
+from bson import Binary, ObjectId
 import base64
 import uuid 
 
@@ -105,14 +105,19 @@ class ArtworkListCreateView(generics.ListCreateAPIView):
             return [IsAuthenticated()]
         return []
 
-class ArtworkDetailView(generics.RetrieveUpdateDestroyAPIView):
+class ArtworkDetailView(generics.RetrieveAPIView):
     queryset = Artwork.objects.all()
     serializer_class = ArtworkSerializer
-    # permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
 
     def get_object(self):
-        raw_pk = self.kwargs.get(self.lookup_field or "pk")
-        return resolve_artwork_by_id(raw_pk)
+        pk = self.kwargs.get('pk')
+        try:
+            # convert to UUID if valid
+            uuid_obj = uuid.UUID(pk)
+            return get_object_or_404(Artwork, id=uuid_obj)
+        except ValueError:
+            return get_object_or_404(Artwork, id=pk)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
